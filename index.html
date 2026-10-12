@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <link rel="stylesheet" href="css/leaflet.photon.css">
+        <style>
+        #map {
+            width: 581px;
+            height: 540px;
+        }
+        </style>
+        <title>Davenport Network analysis of 5 points with address</title>
+    </head>
+    <body>
+        <div id="map">
+        </div>
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Layers.Tree.min.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="js/leaflet.photon.js"></script>
+        <script src="data/pointsforanalysis_0.js"></script>
+        <script src="data/roadsDav_2.js"></script>
+        <script src="data/GeoCodingPluginResults_3.js"></script>
+        <script src="data/distancefrom1000to2767_4.js"></script>
+        <script src="data/distancefrom2767to3598_5.js"></script>
+        <script src="data/distancefrom3598to2452_6.js"></script>
+        <script src="data/distancefrom2452to2098_7.js"></script>
+        <script src="data/distancefrom2098to1000_8.js"></script>
+        <script>
+        var map = L.map('map', {
+            zoomControl:false, maxZoom:28, minZoom:1
+        }).fitBounds([[41.5261945006844,-90.63978143914069],[41.554201345017574,-90.5995121376669]]);
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/qgis2web/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
+        // remove popup's row if "visible-with-data"
+        function removeEmptyRowsFromPopupContent(content, feature) {
+         var tempDiv = document.createElement('div');
+         tempDiv.innerHTML = content;
+         var rows = tempDiv.querySelectorAll('tr');
+         for (var i = 0; i < rows.length; i++) {
+             var td = rows[i].querySelector('td.visible-with-data');
+             var key = td ? td.id : '';
+             if (td && td.classList.contains('visible-with-data') && feature.properties[key] == null) {
+                 rows[i].parentNode.removeChild(rows[i]);
+             }
+         }
+         return tempDiv.innerHTML;
+        }
+        // modify popup if contains media
+        function addClassToPopupIfMedia(content, popup) {
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            var imgTd = tempDiv.querySelector('td img');
+            if (imgTd) {
+                var src = imgTd.getAttribute('src');
+                if (/\.(jpg|jpeg|png|gif|bmp|webp|avif)$/i.test(src)) {
+                    popup._contentNode.classList.add('media');
+                    var img = popup._contentNode.querySelector('td img');
+                    if (img) {
+                        // If already loaded (cache), update immediately
+                        if (img.complete && img.naturalHeight > 0) {
+                            popup.update();
+                        } else {
+                            img.addEventListener('load', function() {
+                                popup.update();
+                            });
+                            img.addEventListener('error', function() {
+                                popup.update();
+                            });
+                        }
+                    }
+                } else if (/\.(mp3|wav|ogg|aac)$/i.test(src)) {
+                    var audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = src;
+                    imgTd.parentNode.replaceChild(audio, imgTd);
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp4|webm|ogg|mov)$/i.test(src)) {
+                    var video = document.createElement('video');
+                    video.controls = true;
+                    video.src = src;
+                    video.style.width = "400px";
+                    video.style.height = "300px";
+                    video.style.maxHeight = "60vh";
+                    video.style.maxWidth = "60vw";
+                    imgTd.parentNode.replaceChild(video, imgTd);
+                    popup._contentNode.classList.add('media');
+                    // Aggiorna il popup quando il video carica i metadati
+                    video.addEventListener('loadedmetadata', function() {
+                        popup.update();
+                    });
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else {
+                    popup._contentNode.classList.remove('media');
+                }
+            } else {
+                popup._contentNode.classList.remove('media');
+            }
+        }
+        var zoomControl = L.control.zoom({
+            position: 'topleft'
+        }).addTo(map);
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {
+        }
+        function pop_pointsforanalysis_0(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['id'] !== null ? autolinker.link(String(feature.properties['id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_pointsforanalysis_0_0() {
+            return {
+                pane: 'pane_pointsforanalysis_0',
+                radius: 4.0,
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(105,115,102,1.0)',
+                interactive: false,
+            }
+        }
+        map.createPane('pane_pointsforanalysis_0');
+        map.getPane('pane_pointsforanalysis_0').style.zIndex = 400;
+        map.getPane('pane_pointsforanalysis_0').style['mix-blend-mode'] = 'normal';
+        var layer_pointsforanalysis_0 = new L.geoJson(json_pointsforanalysis_0, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_pointsforanalysis_0',
+            layerName: 'layer_pointsforanalysis_0',
+            pane: 'pane_pointsforanalysis_0',
+            onEachFeature: pop_pointsforanalysis_0,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_pointsforanalysis_0_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_pointsforanalysis_0);
+        map.addLayer(layer_pointsforanalysis_0);
+        map.createPane('pane_GoogleBaseMap_20261012_083513_1');
+        map.getPane('pane_GoogleBaseMap_20261012_083513_1').style.zIndex = 401;
+        var img_GoogleBaseMap_20261012_083513_1 = 'data/GoogleBaseMap_20261012_083513_1.png';
+        var img_bounds_GoogleBaseMap_20261012_083513_1 = [[41.521013467202565,-90.64742321720536],[41.560368508754635,-90.57662157834473]];
+        var layer_GoogleBaseMap_20261012_083513_1 = new L.imageOverlay(img_GoogleBaseMap_20261012_083513_1,
+                                              img_bounds_GoogleBaseMap_20261012_083513_1,
+                                              {pane: 'pane_GoogleBaseMap_20261012_083513_1'});
+        bounds_group.addLayer(layer_GoogleBaseMap_20261012_083513_1);
+        map.addLayer(layer_GoogleBaseMap_20261012_083513_1);
+        function pop_roadsDav_2(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['full_id'] !== null ? autolinker.link(String(feature.properties['full_id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['osm_id'] !== null ? autolinker.link(String(feature.properties['osm_id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['osm_type'] !== null ? autolinker.link(String(feature.properties['osm_type']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['highway'] !== null ? autolinker.link(String(feature.properties['highway']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['source_hgv'] !== null ? autolinker.link(String(feature.properties['source_hgv']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_name'] !== null ? autolinker.link(String(feature.properties['tiger_name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['alt_name'] !== null ? autolinker.link(String(feature.properties['alt_name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['surface'] !== null ? autolinker.link(String(feature.properties['surface']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_na_1'] !== null ? autolinker.link(String(feature.properties['tiger_na_1']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_na_2'] !== null ? autolinker.link(String(feature.properties['tiger_na_2']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_na_3'] !== null ? autolinker.link(String(feature.properties['tiger_na_3']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_uplo'] !== null ? autolinker.link(String(feature.properties['tiger_uplo']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_tlid'] !== null ? autolinker.link(String(feature.properties['tiger_tlid']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_sour'] !== null ? autolinker.link(String(feature.properties['tiger_sour']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_sepa'] !== null ? autolinker.link(String(feature.properties['tiger_sepa']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['maxweightr'] !== null ? autolinker.link(String(feature.properties['maxweightr']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_zip_'] !== null ? autolinker.link(String(feature.properties['tiger_zip_']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_zi_1'] !== null ? autolinker.link(String(feature.properties['tiger_zi_1']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_na_4'] !== null ? autolinker.link(String(feature.properties['tiger_na_4']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_na_5'] !== null ? autolinker.link(String(feature.properties['tiger_na_5']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_na_6'] !== null ? autolinker.link(String(feature.properties['tiger_na_6']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['maxspeed'] !== null ? autolinker.link(String(feature.properties['maxspeed']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_revi'] !== null ? autolinker.link(String(feature.properties['tiger_revi']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_coun'] !== null ? autolinker.link(String(feature.properties['tiger_coun']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tiger_cfcc'] !== null ? autolinker.link(String(feature.properties['tiger_cfcc']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['lanes'] !== null ? autolinker.link(String(feature.properties['lanes']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_roadsDav_2_0() {
+            return {
+                pane: 'pane_roadsDav_2',
+                opacity: 1,
+                color: 'rgba(36,32,33,1.0)',
+                dashArray: '',
+                lineCap: 'round',
+                lineJoin: 'round',
+                weight: 1.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+        }
+        map.createPane('pane_roadsDav_2');
+        map.getPane('pane_roadsDav_2').style.zIndex = 402;
+        map.getPane('pane_roadsDav_2').style['mix-blend-mode'] = 'normal';
+        var layer_roadsDav_2 = new L.geoJson(json_roadsDav_2, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_roadsDav_2',
+            layerName: 'layer_roadsDav_2',
+            pane: 'pane_roadsDav_2',
+            onEachFeature: pop_roadsDav_2,
+            style: style_roadsDav_2_0,
+        });
+        bounds_group.addLayer(layer_roadsDav_2);
+        map.addLayer(layer_roadsDav_2);
+        function pop_GeoCodingPluginResults_3(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['address'] !== null ? autolinker.link(String(feature.properties['address']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_GeoCodingPluginResults_3_0() {
+            return {
+                pane: 'pane_GeoCodingPluginResults_3',
+                radius: 4.0,
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(114,155,111,1.0)',
+                interactive: false,
+            }
+        }
+        map.createPane('pane_GeoCodingPluginResults_3');
+        map.getPane('pane_GeoCodingPluginResults_3').style.zIndex = 403;
+        map.getPane('pane_GeoCodingPluginResults_3').style['mix-blend-mode'] = 'normal';
+        var layer_GeoCodingPluginResults_3 = new L.geoJson(json_GeoCodingPluginResults_3, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_GeoCodingPluginResults_3',
+            layerName: 'layer_GeoCodingPluginResults_3',
+            pane: 'pane_GeoCodingPluginResults_3',
+            onEachFeature: pop_GeoCodingPluginResults_3,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_GeoCodingPluginResults_3_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_GeoCodingPluginResults_3);
+        map.addLayer(layer_GeoCodingPluginResults_3);
+        function pop_distancefrom1000to2767_4(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['start'] !== null ? autolinker.link(String(feature.properties['start']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['end'] !== null ? autolinker.link(String(feature.properties['end']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2"><strong>distance in meters</strong><br />' + (feature.properties['cost'] !== null ? autolinker.link(String(feature.properties['cost']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_distancefrom1000to2767_4_0() {
+            return {
+                pane: 'pane_distancefrom1000to2767_4',
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'round',
+                lineJoin: 'round',
+                weight: 3.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+        }
+        map.createPane('pane_distancefrom1000to2767_4');
+        map.getPane('pane_distancefrom1000to2767_4').style.zIndex = 404;
+        map.getPane('pane_distancefrom1000to2767_4').style['mix-blend-mode'] = 'normal';
+        var layer_distancefrom1000to2767_4 = new L.geoJson(json_distancefrom1000to2767_4, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_distancefrom1000to2767_4',
+            layerName: 'layer_distancefrom1000to2767_4',
+            pane: 'pane_distancefrom1000to2767_4',
+            onEachFeature: pop_distancefrom1000to2767_4,
+            style: style_distancefrom1000to2767_4_0,
+        });
+        bounds_group.addLayer(layer_distancefrom1000to2767_4);
+        map.addLayer(layer_distancefrom1000to2767_4);
+        function pop_distancefrom2767to3598_5(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['start'] !== null ? autolinker.link(String(feature.properties['start']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['end'] !== null ? autolinker.link(String(feature.properties['end']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2"><strong>distance in meters</strong><br />' + (feature.properties['cost'] !== null ? autolinker.link(String(feature.properties['cost']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_distancefrom2767to3598_5_0() {
+            return {
+                pane: 'pane_distancefrom2767to3598_5',
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'round',
+                lineJoin: 'round',
+                weight: 3.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+        }
+        map.createPane('pane_distancefrom2767to3598_5');
+        map.getPane('pane_distancefrom2767to3598_5').style.zIndex = 405;
+        map.getPane('pane_distancefrom2767to3598_5').style['mix-blend-mode'] = 'normal';
+        var layer_distancefrom2767to3598_5 = new L.geoJson(json_distancefrom2767to3598_5, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_distancefrom2767to3598_5',
+            layerName: 'layer_distancefrom2767to3598_5',
+            pane: 'pane_distancefrom2767to3598_5',
+            onEachFeature: pop_distancefrom2767to3598_5,
+            style: style_distancefrom2767to3598_5_0,
+        });
+        bounds_group.addLayer(layer_distancefrom2767to3598_5);
+        map.addLayer(layer_distancefrom2767to3598_5);
+        function pop_distancefrom3598to2452_6(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['start'] !== null ? autolinker.link(String(feature.properties['start']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['end'] !== null ? autolinker.link(String(feature.properties['end']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2"><strong>distance in meters</strong><br />' + (feature.properties['cost'] !== null ? autolinker.link(String(feature.properties['cost']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_distancefrom3598to2452_6_0() {
+            return {
+                pane: 'pane_distancefrom3598to2452_6',
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'round',
+                lineJoin: 'round',
+                weight: 3.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+        }
+        map.createPane('pane_distancefrom3598to2452_6');
+        map.getPane('pane_distancefrom3598to2452_6').style.zIndex = 406;
+        map.getPane('pane_distancefrom3598to2452_6').style['mix-blend-mode'] = 'normal';
+        var layer_distancefrom3598to2452_6 = new L.geoJson(json_distancefrom3598to2452_6, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_distancefrom3598to2452_6',
+            layerName: 'layer_distancefrom3598to2452_6',
+            pane: 'pane_distancefrom3598to2452_6',
+            onEachFeature: pop_distancefrom3598to2452_6,
+            style: style_distancefrom3598to2452_6_0,
+        });
+        bounds_group.addLayer(layer_distancefrom3598to2452_6);
+        map.addLayer(layer_distancefrom3598to2452_6);
+        function pop_distancefrom2452to2098_7(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['start'] !== null ? autolinker.link(String(feature.properties['start']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['end'] !== null ? autolinker.link(String(feature.properties['end']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2"><strong>distance in meters</strong><br />' + (feature.properties['cost'] !== null ? autolinker.link(String(feature.properties['cost']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_distancefrom2452to2098_7_0() {
+            return {
+                pane: 'pane_distancefrom2452to2098_7',
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'round',
+                lineJoin: 'round',
+                weight: 3.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+        }
+        map.createPane('pane_distancefrom2452to2098_7');
+        map.getPane('pane_distancefrom2452to2098_7').style.zIndex = 407;
+        map.getPane('pane_distancefrom2452to2098_7').style['mix-blend-mode'] = 'normal';
+        var layer_distancefrom2452to2098_7 = new L.geoJson(json_distancefrom2452to2098_7, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_distancefrom2452to2098_7',
+            layerName: 'layer_distancefrom2452to2098_7',
+            pane: 'pane_distancefrom2452to2098_7',
+            onEachFeature: pop_distancefrom2452to2098_7,
+            style: style_distancefrom2452to2098_7_0,
+        });
+        bounds_group.addLayer(layer_distancefrom2452to2098_7);
+        map.addLayer(layer_distancefrom2452to2098_7);
+        function pop_distancefrom2098to1000_8(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['start'] !== null ? autolinker.link(String(feature.properties['start']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['end'] !== null ? autolinker.link(String(feature.properties['end']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2"><strong>distance in meters</strong><br />' + (feature.properties['cost'] !== null ? autolinker.link(String(feature.properties['cost']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_distancefrom2098to1000_8_0() {
+            return {
+                pane: 'pane_distancefrom2098to1000_8',
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'round',
+                lineJoin: 'round',
+                weight: 3.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+        }
+        map.createPane('pane_distancefrom2098to1000_8');
+        map.getPane('pane_distancefrom2098to1000_8').style.zIndex = 408;
+        map.getPane('pane_distancefrom2098to1000_8').style['mix-blend-mode'] = 'normal';
+        var layer_distancefrom2098to1000_8 = new L.geoJson(json_distancefrom2098to1000_8, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_distancefrom2098to1000_8',
+            layerName: 'layer_distancefrom2098to1000_8',
+            pane: 'pane_distancefrom2098to1000_8',
+            onEachFeature: pop_distancefrom2098to1000_8,
+            style: style_distancefrom2098to1000_8_0,
+        });
+        bounds_group.addLayer(layer_distancefrom2098to1000_8);
+        map.addLayer(layer_distancefrom2098to1000_8);
+        var overlaysTree = [
+            {label: '<img src="legend/distancefrom2098to1000_8.png" /> distance from 2098 to 1000', layer: layer_distancefrom2098to1000_8},
+            {label: '<img src="legend/distancefrom2452to2098_7.png" /> distance from 2452 to 2098', layer: layer_distancefrom2452to2098_7},
+            {label: '<img src="legend/distancefrom3598to2452_6.png" /> distance from 3598 to 2452', layer: layer_distancefrom3598to2452_6},
+            {label: '<img src="legend/distancefrom2767to3598_5.png" /> distance from 2767 to 3598', layer: layer_distancefrom2767to3598_5},
+            {label: '<img src="legend/distancefrom1000to2767_4.png" /> distance from 1000 to 2767', layer: layer_distancefrom1000to2767_4},
+            {label: '<img src="legend/GeoCodingPluginResults_3.png" /> GeoCoding Plugin Results', layer: layer_GeoCodingPluginResults_3},
+            {label: '<img src="legend/roadsDav_2.png" /> roadsDav', layer: layer_roadsDav_2},
+            {label: "Google BaseMap_2026-10-12_08-35-13", layer: layer_GoogleBaseMap_20261012_083513_1},
+            {label: '<img src="legend/pointsforanalysis_0.png" /> points for analysis', layer: layer_pointsforanalysis_0},]
+        var lay = L.control.layers.tree(null, overlaysTree,{
+            //namedToggle: true,
+            //selectorBack: false,
+            //closedSymbol: '&#8862; &#x1f5c0;',
+            //openedSymbol: '&#8863; &#x1f5c1;',
+            //collapseAll: 'Collapse all',
+            //expandAll: 'Expand all',
+            collapsed: true,
+        });
+        lay.addTo(map);
+        setBounds();
+        var i = 0;
+        layer_pointsforanalysis_0.eachLayer(function(layer) {
+            var context = {
+                feature: layer.feature,
+                variables: {}
+            };
+            layer.bindTooltip((layer.feature.properties['name'] !== null?String('<div style="color: #323232; font-size: 10pt; font-weight: bold; font-family: \'Open Sans\', sans-serif;">' + layer.feature.properties['name']).replace(/\\n/g, '<br>') + '</div>':''), {permanent: true, offset: [-0, -16], className: 'css_pointsforanalysis_0'});
+            labels.push(layer);
+            totalMarkers += 1;
+              layer.added = true;
+              addLabel(layer, i);
+              i++;
+        });
+        var i = 0;
+        layer_GeoCodingPluginResults_3.eachLayer(function(layer) {
+            var context = {
+                feature: layer.feature,
+                variables: {}
+            };
+            layer.bindTooltip((layer.feature.properties['address'] !== null?String('<div style="color: #323232; font-size: 10pt; font-weight: bold; font-family: \'Open Sans\', sans-serif;">' + layer.feature.properties['address']).replace(/\\n/g, '<br>') + '</div>':''), {permanent: true, offset: [-0, -16], className: 'css_GeoCodingPluginResults_3'});
+            labels.push(layer);
+            totalMarkers += 1;
+              layer.added = true;
+              addLabel(layer, i);
+              i++;
+        });
+        L.ImageOverlay.include({
+            getBounds: function () {
+                return this._bounds;
+            }
+        });
+        resetLabels([layer_pointsforanalysis_0,layer_GeoCodingPluginResults_3]);
+        map.on("zoomend", function(){
+            resetLabels([layer_pointsforanalysis_0,layer_GeoCodingPluginResults_3]);
+        });
+        map.on("layeradd", function(){
+            resetLabels([layer_pointsforanalysis_0,layer_GeoCodingPluginResults_3]);
+        });
+        map.on("layerremove", function(){
+            resetLabels([layer_pointsforanalysis_0,layer_GeoCodingPluginResults_3]);
+        });
+        </script>
+    </body>
+</html>
